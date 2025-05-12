@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AP GPT - AI Chat Assistant</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'cyber-blue': '#00f0ff',
+                        'cyber-pink': '#ff00ff',
+                        'cyber-yellow': '#fcee09',
+                        'cyber-dark': '#0f1a2e',
+                        'cyber-darker': '#0a1021',
+                        'cyber-light': '#2f3b52'
+                    },
+                    boxShadow: {
+                        'cyber': '0 0 10px #00f0ff, 0 0 20px rgba(0, 240, 255, 0.3)',
+                        'cyber-pink': '0 0 10px #ff00ff, 0 0 20px rgba(255, 0, 255, 0.3)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: #0f1a2e;
+            background-image: 
+                linear-gradient(rgba(0, 240, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 240, 255, 0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .mono {
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .chat-container {
+            height: calc(100vh - 180px);
+            scrollbar-width: thin;
+            scrollbar-color: #00f0ff #0f1a2e;
+        }
+
+        .chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-container::-webkit-scrollbar-track {
+            background: #0f1a2e;
+        }
+
+        .chat-container::-webkit-scrollbar-thumb {
+            background-color: #00f0ff;
+            border-radius: 10px;
+        }
+
+        .message-bubble {
+            max-width: 80%;
+            animation: fadeIn 0.3s ease-in;
+            backdrop-filter: blur(5px);
+            border: 1px solid;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .typing-indicator {
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0.5; }
+        }
+
+        .cyber-border {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cyber-border::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #00f0ff, transparent);
+            animation: scanline 2s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% {
+                transform: translateX(-100%);
+            }
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        .btn-glow:hover {
+            box-shadow: 0 0 10px #00f0ff, 0 0 20px rgba(0, 240, 255, 0.5);
+        }
+
+        .input-glow:focus {
+            box-shadow: 0 0 5px #00f0ff, 0 0 10px rgba(0, 240, 255, 0.3);
+        }
+
+        .neon-text {
+            text-shadow: 0 0 5px #00f0ff, 0 0 10px rgba(0, 240, 255, 0.6);
+        }
+
+        .ai-message-glow {
+            box-shadow: 0 0 5px #00f0ff, 0 0 10px rgba(0, 240, 255, 0.3);
+        }
+
+        .user-message-glow {
+            box-shadow: 0 0 5px #ff00ff, 0 0 10px rgba(255, 0, 255, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-cyber-dark text-gray-300">
+    <div id="app" class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-cyber-darker border-b border-cyber-blue/30 shadow-cyber">
+            <div class="container mx-auto px-4 py-4">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-3xl font-bold text-cyber-blue neon-text mono">AP GPT</h1>
+                    <div class="flex items-center space-x-4">
+                        <button @click="toggleTheme" class="text-gray-300 hover:text-cyber-blue transition">
+                            <i class="bi bi-lightning-fill"></i>
+                        </button>
+                        <button @click="clearChat" class="text-gray-300 hover:text-cyber-pink transition">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Chat Container -->
+        <main class="container mx-auto px-4 py-6">
+            <div class="bg-cyber-darker/70 rounded-lg backdrop-blur-sm border border-cyber-blue/30 shadow-lg p-4 cyber-border">
+                <div class="chat-container overflow-y-auto mb-4 pr-2" ref="chatContainer">
+                    <div v-if="messages.length === 0" class="flex items-center justify-center h-full">
+                        <div class="text-center text-gray-400">
+                            <i class="bi bi-robot text-4xl mb-2 text-cyber-blue"></i>
+                            <p class="mono">INITIATE COMMUNICATION SEQUENCE</p>
+                        </div>
+                    </div>
+                    <div v-else>
+                        <div v-for="(message, index) in messages" 
+                             :key="index" 
+                             class="mb-4">
+                            <div :class="[
+                                'message-bubble p-3 rounded-lg',
+                                message.role === 'user' 
+                                    ? 'bg-cyber-light/50 border-cyber-pink text-white ml-auto user-message-glow' 
+                                    : 'bg-cyber-light/30 border-cyber-blue text-gray-200 ai-message-glow'
+                            ]">
+                                <div v-if="message.role === 'assistant'" class="flex items-center mb-1">
+                                    <div class="w-2 h-2 rounded-full bg-cyber-blue mr-2 animate-pulse"></div>
+                                    <span class="text-xs text-cyber-blue mono">AP GPT</span>
+                                </div>
+                                <div v-else class="flex items-center justify-end mb-1">
+                                    <span class="text-xs text-cyber-pink mono">USER</span>
+                                    <div class="w-2 h-2 rounded-full bg-cyber-pink ml-2"></div>
+                                </div>
+                                <div class="whitespace-pre-line">{{ message.content }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="isLoading" class="flex items-center space-x-2 text-cyber-blue mono p-3">
+                        <span class="typing-indicator">■</span>
+                        <span class="typing-indicator" style="animation-delay: 0.2s">■</span>
+                        <span class="typing-indicator" style="animation-delay: 0.4s">■</span>
+                        <span class="ml-2">PROCESSING</span>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="border-t border-cyber-blue/30 pt-4">
+                    <form @submit.prevent="sendMessage" class="flex gap-2">
+                        <input 
+                            v-model="userInput"
+                            type="text"
+                            placeholder="// Enter your command"
+                            class="flex-1 rounded-md bg-cyber-light/40 border border-cyber-blue/50 px-4 py-2 focus:outline-none focus:border-cyber-blue text-white mono input-glow placeholder-gray-500"
+                            :disabled="isLoading"
+                        >
+                        <button 
+                            type="submit"
+                            class="bg-cyber-blue/20 border border-cyber-blue text-cyber-blue px-6 py-2 rounded-md hover:bg-cyber-blue/30 transition-colors mono btn-glow"
+                            :disabled="isLoading || !userInput.trim()"
+                        >
+                            <i class="bi bi-send"></i> SEND
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    messages: [],
+                    userInput: '',
+                    isLoading: false,
+                    darkTheme: true
+                }
+            },
+            methods: {
+                async sendMessage() {
+                    if (!this.userInput.trim()) return
+
+                    // Add user message
+                    this.messages.push({
+                        role: 'user',
+                        content: this.userInput.trim()
+                    })
+
+                    const userMessage = this.userInput
+                    this.userInput = ''
+                    this.isLoading = true
+
+                    // Scroll to bottom
+                    this.$nextTick(() => {
+                        this.scrollToBottom()
+                    })
+
+                    try {
+                        const response = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/ai', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': 'Bearer ddSDvKia1cVDsfcWLifkTztgZgn2',
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                messages: [{
+                                    role: 'user',
+                                    content: [{
+                                        type: 'text',
+                                        text: userMessage
+                                    }]
+                                }]
+                            })
+                        })
+
+                        const data = await response.json()
+                        
+                        // Add AI response
+                        this.messages.push({
+                            role: 'assistant',
+                            content: data.message
+                        })
+
+                    } catch (error) {
+                        console.error('Error:', error)
+                        this.messages.push({
+                            role: 'assistant',
+                            content: 'SYSTEM ERROR: Communication circuit disrupted. Attempt reconnection sequence.'
+                        })
+                    } finally {
+                        this.isLoading = false
+                        this.$nextTick(() => {
+                            this.scrollToBottom()
+                        })
+                    }
+                },
+                scrollToBottom() {
+                    const container = this.$refs.chatContainer
+                    container.scrollTop = container.scrollHeight
+                },
+                clearChat() {
+                    if (confirm('CONFIRM: Delete all communication records?')) {
+                        this.messages = []
+                        // Welcome message
+                        this.messages.push({
+                            role: 'assistant',
+                            content: 'SYSTEM REBOOTED. AP GPT neural network online. How may I assist you?'
+                        })
+                    }
+                },
+                toggleTheme() {
+                    // This is just a placeholder for theme toggle functionality
+                    // You could expand this to switch between different cyberpunk color schemes
+                    this.darkTheme = !this.darkTheme
+                    const blueHighlight = this.darkTheme ? '#00f0ff' : '#ff9e00'
+                    document.documentElement.style.setProperty('--cyber-highlight', blueHighlight)
+                }
+            },
+            mounted() {
+                // Welcome message
+                this.messages.push({
+                    role: 'assistant',
+                    content: 'SYSTEM ONLINE. AP GPT neural network initialized. How may I assist you?'
+                })
+
+                // Handle Enter key for sending messages
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !this.isLoading && this.userInput.trim()) {
+                        e.preventDefault()
+                        this.sendMessage()
+                    }
+                })
+            }
+        }).mount('#app')
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
